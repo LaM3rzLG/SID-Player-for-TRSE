@@ -484,7 +484,7 @@ begin
 		ret
 
 	;	rekord: $00..$0F = bit 0 lepes (2 byte), bit 1 lepes += elojeles byte, bit 2 szelet, bit 3 PW;
-	;	$80+n = n kepkocka valtozas nelkul; $10 lo hi n = REF (n rekord onnan); $11 lo hi = ugras (hurok)
+	;	$80+n = n kepkocka valtozas nelkul; $10 lo hi n = REF (n rekord onnan); $11 lo hi = ugras (az ismetlodo szakasz elejere)
 	SdLep:
 		ld	a,(SdM+2)
 		or	a
