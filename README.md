@@ -1,30 +1,35 @@
-# SID Player for TRSE
+# SID2TVC TRSE Unit (SID Player for TRSE)
 
 **C64-es SID-zene háttérzenének Videoton TV-Computer játékokhoz – TRSE-unit.**
 
-A [SIDSoftEMU](https://github.com/LaM3rzLG/SIDSoftEMU) lejátszója **TRSE-unitként** (`SID.tru`), ahogy a GE: `@use "SID"`, és `SID::Start` / `SID::Play` /
-`SID::Stop`. A C64-es SID-zenét a TVC saját 4 bites hangkimenetén játssza le, 3 hangon, SID-kártya nélkül, **miközben a
-játék fut**: a `SID::Play`-t képkockánként kell hívni a játék fő hurkából. A zenét előbb PC-n kell átalakítani a
-[`sid2tvc`](https://github.com/LaM3rzLG/TVC-Programok/tree/main/sid2tvc)-vel.
+A [SIDSoftEMU](https://github.com/LaM3rzLG/TVC-Programok/tree/main/SIDSoftEMU) lejátszója unitként (`SID.tru`), ahogy a
+GE: `@use "SID"`, és `SID::Start` / `SID::Play` / `SID::Stop`. A C64-es SID-zenét a TVC saját 4 bites hangkimenetén
+játssza le, 3 hangon, SID-kártya nélkül, **miközben a játék fut**: a `SID::Play`-t képkockánként kell hívni a játék fő
+hurkából.
 
-## A repó tartalma
+## Mi kell hozzá
 
-| Fájl | Mi ez |
-|---|---|
-| `SID.tru` | **a unit** – az elején a teljes leírás (paraméterek, belépési pontok, szabályok). Másold a programod mellé. |
-| `SIDPelda.ras`, `SIDPelda.trse` | minta: egy négyzet pattog a képen, közben szól a zene (bármely gomb = vége) |
-| `SIDPelda.cas`, `SIDPelda.dsk` | a lefordított minta: lemezen `LOAD "SIDPELDA"` |
-| `resources/lejatszo/demo_*.bin` | a minta zenéje: The Last Ninja 1. dal, 1 perc, `$6000`-ra áthelyezve (eredeti: Ben Daglish & Anthony Lees, System 3, 1987) |
-| `tools/stc2bin.py` | átalakító: `.STC` → a dal a kívánt címre + paletta (Python 3) |
-| `LICENSE` | MIT licenc |
+- **TRSE** – a unitot a programoddal együtt fordítja (Windows, Mac, Linux),
+- **[SID2TVC Converter](https://github.com/LaM3rzLG/TVC-Programok/tree/main/SID2TVC_Converter)** (`sid2tvc` 1.4,
+  letölthető Windowsra, Macre, Linuxra) – a PC elvégez mindent, a TVC csak lejátszik.
 
 ## A zene elkészítése
 
-1. `.sid` → `.STC`: `sid2tvc -s 1 zene.sid` → `SID_TVC/ZENE/SONG1.STC`
-   (`.sid` zenék: [HVSC](https://www.hvsc.c64.org/)).
-2. `.STC` → a memóriába: `python3 tools/stc2bin.py -c 6000 SONG1.STC zene`
-   → `zene_dal.bin` (**a `$6000`-ra áthelyezve** – a `-c` a dal címe a programodban) és `zene_paletta.bin` (3584 byte).
-   Kiírja a címet, a szerzőt, a hosszt (képkocka, 50/s) és a hurokpontot is.
+```
+sid2tvc -b -s 1 zene.sid        az 1. aldal (-a: az összes aldal)
+sid2tvc -b SONG1.STC            egy kész .STC-ből (pl. a SIDSoftEMU dalai)
+sid2tvc -b -t 60 zene.sid       legfeljebb 1 perc, aztán elölről - kisebb dal
+```
+
+Dalonként két fájl lesz, és a program kiírja a méretüket:
+
+| Fájl | Mi | Hová |
+|---|---|---|
+| `SONG1_TAB.BIN` | a dal hangszín-táblái – csak amennyit a dal tényleg használ (1–14 × 256 byte) | **laphatárra** (`$xx00`) |
+| `SONG1_DAL.BIN` | a kotta | **bárhová** |
+
+Kell még egy közös, 512 byte-os hely (laphatáron): ide a unit maga készíti el a zaj- és a szinttáblát. Több zenénél is
+elég egy. Hogy mi hová kerül, azt a programozó dönti el a méretek alapján.
 
 ## Használat
 
@@ -33,19 +38,19 @@ játék fut**: a `SID::Play`-t képkockánként kell hívni a játék fő hurká
 @use "SID"
 
 var
-  Dal     : incbin("zene_dal.bin", $6000);      { ugyanaz a cím, mint a stc2bin -c }
-  Paletta : incbin("zene_paletta.bin");
+  ZeneTab : incbin("SONG1_TAB.BIN", $5000);    { laphatárra }
+  ZeneDal : incbin("SONG1_DAL.BIN", $5E00);    { bárhová }
 
 begin
   GE::Init(GE::DIRECT_TO_SCREEN);
-  GE::SetMemory(GE::MEM_48K_VID);               { U0, U1, VID, U3: a táblák az U3-ban ($F000) }
-  SID::Init(#Dal, #Paletta, $F0);
-  SID::Start();
+  GE::SetMemory(GE::MEM_VID_ON);
+  SID::Init(#ZeneDal, $50, $4E);               { a kotta, a táblák lapja, a közös 512 byte lapja ($4E00) }
+  if (SID::Hiba = 0) then SID::Start();
   while (...) do
   begin
-    SID::Sync();                                { vár a következő képkockára - a GE::WaitForSync helyett }
+    SID::Sync();                               { vár a következő képkockára - a GE::WaitForSync helyett }
     { ... rajzolás, játéklogika ... }
-    SID::Play();                                { a zene léptetése }
+    SID::Play();                               { a zene léptetése }
   end;
   SID::Stop();
 end.
@@ -53,48 +58,55 @@ end.
 
 | Belépési pont | Mit csinál |
 |---|---|
-| `SID::Init(Dal, Paletta, Lap)` | a dal címe, a paletta címe, a táblák lapja (felső byte; `$F0` = `$F000–$FFFF`, vagy pl. `$70` = `$7000–$7FFF`). Táblákat készít, a dekódolót alaphelyzetbe teszi. |
-| `SID::Start()` | saját hang-IT a `$38`-ra (5008 Hz, a kép aljához igazítva) – innentől szól |
+| `SID::Init(Dal, Lap, KozosLap)` | a kotta címe, a táblák lapja, a közös 512 byte lapja (a cím felső byte-ja). Ellenőriz, elkészíti a közös táblákat. Eredmény: `SID::Hiba` (0 = jó, 1 = nem `sid2tvc -b` kotta, 2 = a területek átfedik egymást) |
+| `SID::Start()` | elindítja a zenét (saját hang-megszakítás, a kép aljához igazítva) |
 | `SID::Sync()` | vár a következő képkockára (50/s) – a játék képkocka-szinkronja |
 | `SID::Play()` | a zene léptetése; ha a játék lekésett egy-két képkockát, behozza (a tempó nem csúszik) |
-| `SID::Stop()` | csend, a régi IT, a CRTC és a hang-port vissza |
+| `SID::Stop()` | leállítás, minden vissza |
 
-Asm-ből: `call SdStartK`, `call SdWaitK` (Sync), `call SdStepK` (Play), `call SdStopK`.
+## Memória
 
-## Szabályok lejátszás közben
+A unit kódja kb. 1,6 KB (benne a 256 byte-os zajminta). Ehhez jön dalonként a `_TAB.BIN` és a `_DAL.BIN`, és egyszer a
+közös 512 byte. Semmi nem marad a memóriában feleslegesen: minden a végleges helyén van, másolás nincs. A legtöbb helyet a
+kotta viszi (egy teljes Last Ninja dal 22–48 KB) – játékba a `-t` kapcsolóval rövidebb zene készíthető.
 
-- **Regiszterek:** a hang-IT foglalja a második regiszterkészletet (BC' DE' HL') és az AF'-et. **IX és IY szabad** (a GE
-  sprite-jai is használhatják). A GE digi-hangja ugyanezt foglalja, ezért a kettő egyszerre nem mehet.
-- **IT:** a `$38`-on a lejátszó IT-je van, ezért a `GE::WaitForSync` (`halt`, bármely IT-re továbblép), a
-  `GE::EnableTVCITHandler`, a `GE::DigiSoundOn` és a ROM-hívások nem használhatók. Szinkron: `SID::Sync`.
-- **Memória:** a táblák (`Lap`, 4 KB) és a unit kódja mindig látsszon; a dal csak a `SID::Play` alatt kell (a Play
-  ideiglenesen `$B0`-ra lapoz). `Lap = $F0` esetén a 3. lapon U3 kell (`GE::MEM_48K_VID`); `Lap = $70`-nel bármilyen
-  lapozás jó.
-- **di-szakasz** legfeljebb ~600 T lehet: a hang-IT 624 T-nként jön, ha kettő összeér, egy elvész.
-- **CPU:** a hang-IT a processzoridő kb. **63%-a**, a `SID::Play` kb. 2–3% képkockánként – a többi a játéké.
-- A `Start` a CRTC-t a hang-IT-hez igazítja (R5 = 0, kurzor-IT ki), a `Stop` visszaállítja.
-- A zene a végén a hurokpontra ugrik, a `SID::Stop`-ig szól.
+## Amire figyelni kell
 
-## Fordítás
+- A zene a gép idejének kb. **63%-át** viszi el, a többi a játéké – egyszerűbb játékokhoz való.
+- Lejátszás alatt nem használható: `GE::WaitForSync` (helyette `SID::Sync`), a GE digi-hangja, ROM-hívás.
+- A táblák (`Lap`, `KozosLap`) mindig látsszanak: az U0/U1-ben (`$0000–$7FFF`) bármilyen lapozás jó; ha az U3-ban
+  (`$C000–$FFFF`) vannak, a lejátszás alatt `GE::MEM_48K_VID` kell. A kotta bárhol lehet.
+- A részletek (regiszterek, megszakítás) a `SID.tru` elején.
 
-TRSE-ben nyisd meg a `SIDPelda.trse`-t, és fordítsd le (Build): a TRSE a `SID.tru`-t a projekt mappájából veszi.
-Parancssorból: `trse -cli op=project project=SIDPelda.trse input_file=SIDPelda.ras assemble=yes`.
+## Tartalom
 
-## Licenc
+| Fájl | Mi ez |
+|---|---|
+| `SID.tru` | **a unit** – az elején a teljes leírás. Másold a programod mellé. |
+| `SIDPelda.ras`, `SIDPelda.trse` | minta: egy négyzet pattog a képen, közben szól a zene (bármely gomb = vége) |
+| `SIDPelda.cas`, `SIDPelda.dsk` | a lefordított minta: lemezen `LOAD "SIDPELDA"` |
+| `resources/demo/DEMO_TAB.BIN`, `DEMO_DAL.BIN` | a minta zenéje: The Last Ninja 1. dal, 1 perc (eredeti: Ben Daglish & Anthony Lees, System 3, 1987) |
+| `LICENSE` | MIT licenc |
 
-**MIT** ([LICENSE](LICENSE)): szabadon használható és beépíthető bármilyen programba, a forrását sem kell
-kiadni. A minta zenéje (Last Ninja, Ben Daglish & Anthony Lees, System 3) a szerzőké.
+Fordítás: TRSE-ben nyisd meg a `SIDPelda.trse`-t, és fordítsd le (Build). A TRSE a `SID.tru`-t a projekt mappájából
+veszi.
+
+## Hogyan működik?
+
+A nehéz munkát a PC végzi: a sid2tvc lefuttatja a C64-es zenelejátszót, kiszámolja, hogyan szólna a SID (hullámformák,
+szűrő, hangerő), és ebből dalonként egy kis hangszínpalettát és egy tömörített kottát készít. A TVC-nek már csak le kell
+játszania: másodpercenként kb. 5000-szer összekeveri a három hangot, és kiküldi a 4 bites hangkimenetre; képkockánként
+(50/s) a `SID::Play` olvassa tovább a kottát.
 
 ## English
 
-**SID Player for TRSE** – a TRSE unit that plays C64 SID music on the Videoton TV-Computer's own 4-bit sound output
-(3 voices, 5008 Hz sound interrupt, no SID card needed) **while your game runs**. Convert the tune on the PC with
-[`sid2tvc`](https://github.com/LaM3rzLG/TVC-Programok/tree/main/sid2tvc) (`.sid` → `.STC`), then with
-`tools/stc2bin.py -c ADDR` (song relocated to ADDR + palette). In the program: `@use "SID"`, `SID::Init(#Song,
-#Palette, $F0)`, `SID::Start()`, then every frame `SID::Sync()` (instead of `GE::WaitForSync`) and `SID::Play()`,
-finally `SID::Stop()`. The sound interrupt takes ~63% of the CPU and owns the shadow registers (BC' DE' HL' AF');
-IX and IY are free. Full description (in Hungarian) at the top of `SID.tru`. Example: `SIDPelda.ras` (a bouncing
-box with music; `LOAD "SIDPELDA"`). Licence: MIT.
+**SID2TVC TRSE Unit** – a TRSE unit that plays C64 SID music on the Videoton TV-Computer's own 4-bit sound output
+(3 voices, no SID card) **while your game runs**. Convert the tune with
+[`sid2tvc`](https://github.com/LaM3rzLG/TVC-Programok/tree/main/SID2TVC_Converter) `-b` (`.sid` or `.STC` →
+`SONG1_TAB.BIN`: the used tone tables, page-aligned; `SONG1_DAL.BIN`: the relocatable score, anywhere). Then:
+`@use "SID"`, `SID::Init(#Score, TablePage, CommonPage)`, `SID::Start()`, every frame `SID::Sync()` (instead of
+`GE::WaitForSync`) and `SID::Play()`, finally `SID::Stop()`. The music takes ~63% of the CPU. Full description (in
+Hungarian) at the top of `SID.tru`. Example: `SIDPelda.ras` (`LOAD "SIDPELDA"`). Licence: MIT.
 
 ---
-SID Player for TRSE – L@M3rZ (LaM3rzLG), 2026.
+SID2TVC TRSE Unit – L@M3rZ (LaM3rzLG), 2026.

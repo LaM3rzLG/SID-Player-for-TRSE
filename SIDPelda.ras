@@ -3,12 +3,13 @@ program SIDPelda;
 @use "SID"
 
 /* Minta a SID unithoz: háttérzene egy egyszerű "játék" alatt - egy négyzet pattog, képkockánként mozog.
-   Bármely gomb = vége. A dal a $6000-on (stc2bin.py -c 6000), a paletta a $5000-on; a táblák a $F000-$FFFF-en (U3),
-   ezért a lejátszás alatt GE::MEM_48K_VID a lapozás (U0, U1, VID, U3). */
+   Bármely gomb = vége. A zene: sid2tvc -b DEMO.STC -> DEMO_TAB.BIN (14 tábla) + DEMO_DAL.BIN. Memória:
+   $4E00-$4FFF a közös 512 byte (a unit tölti), $5000-$5DFF a táblák, $5E00-tól a kotta - mind az U0/U1-ben, ezért
+   bármilyen lapozás jó (itt GE::MEM_VID_ON). */
 
 var
-	DemoDal		:	incbin("resources/lejatszo/demo_dal.bin", $6000);
-	DemoPaletta	:	incbin("resources/lejatszo/demo_paletta.bin", $5000);
+	DemoTab		:	incbin("resources/demo/DEMO_TAB.BIN", $5000);	/* laphatárra */
+	DemoDal		:	incbin("resources/demo/DEMO_DAL.BIN", $5E00);	/* The Last Ninja 1. dal, 1 perc */
 	x, y, dx, dy, Gomb	:	byte;
 
 /* Gomb := 1, ha valamelyik billentyű le van nyomva (a billentyűzet-sorok közvetlenül: port 3, port $58) */
@@ -42,9 +43,11 @@ begin
 	GE::Init(GE::DIRECT_TO_SCREEN);
 	GE::SetGraphics(GE::GRAPHICS16);
 	GE::ClearScreen(GE::GR16_COLOR_BLACK);
-	GE::SetMemory(GE::MEM_48K_VID);
+	GE::SetMemory(GE::MEM_VID_ON);		/* U0, U1, VID, SYS: a képernyő látszik; a SID táblái az U1-ben vannak */
 
-	SID::Init(#DemoDal, #DemoPaletta, $F0);
+	SID::Init(#DemoDal, $50, $4E);		/* a kotta, a táblák lapja ($5000), a közös 512 byte lapja ($4E00) */
+	if (SID::Hiba <> 0) then
+		while (true) do begin end;		/* rossz .STC: nem indul */
 	SID::Start();
 
 	x := 10;
