@@ -1,5 +1,7 @@
 # SID2TVC TRSE Unit (SID Player for TRSE)
 
+![SID-PLAYER TRSE UNIT](kepek/sidplayer.png)
+
 **C64-es SID-zene háttérzenének Videoton TV-Computer játékokhoz – TRSE-unit.**
 
 A [SIDSoftEMU](https://github.com/LaM3rzLG/TVC-Programok/tree/main/SIDSoftEMU) lejátszója unitként (`SID.tru`), ahogy a
@@ -86,6 +88,7 @@ kotta viszi (egy teljes Last Ninja dal 22–48 KB) – játékba a `-t` kapcsol�
 | `SIDPelda.ras`, `SIDPelda.trse` | minta: egy négyzet pattog a képen, közben szól a zene (bármely gomb = vége) |
 | `SIDPelda.cas`, `SIDPelda.dsk` | a lefordított minta: lemezen `LOAD "SIDPELDA"` |
 | `resources/demo/DEMO_TAB.BIN`, `DEMO_DAL.BIN` | a minta zenéje: The Last Ninja 1. dal, 1 perc (eredeti: Ben Daglish & Anthony Lees, System 3, 1987) |
+| `kepek/sidplayer.png` | a kiadás képe |
 | `LICENSE` | MIT licenc |
 
 Fordítás: TRSE-ben nyisd meg a `SIDPelda.trse`-t, és fordítsd le (Build). A TRSE a `SID.tru`-t a projekt mappájából
